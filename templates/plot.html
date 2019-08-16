@@ -100,7 +100,7 @@ g = {
 {%for edge in edges%}
 	{%if edge[2] in nodes%}
 		g['edges'].push({'id':'e{{count.c}}',label:'{{edge[3]}}','source':'{{edge[0]}}','target':'{{edge[2]}}',type:'arrow',size: Math.random(),
-    color: '#555',})
+    color: '#555', uri:'{{edge[1]}}',sourceUri:'{{nodes[edge[0]]["uri"]}}',targetUri:'{{nodes[edge[2]]["uri"]}}'})
 	{%endif%}
 	{%if count.update({'c':(count.c +1)})%}{%endif%}
 {%endfor%}
@@ -112,7 +112,12 @@ s = new sigma({
     type: 'canvas'
   },
   settings: {
-  	edgeLabelSize: 'proportional'
+  	edgeLabelSize: 'proportional',
+  	enableEdgeHovering: true,
+    edgeHoverColor: 'edge',
+    defaultEdgeHoverColor: '#f00',
+    edgeHoverSizeRatio: 2,
+    edgeHoverExtremities: true,
   }
 });
 
@@ -122,13 +127,29 @@ s.bind('clickNode', function(e) {
 	var div = document.getElementById('properties');
 	var stringHTML = "<center><h3>< "+uri+" ></h3></center><br/><ul>";
 	for(property in properties){
-		stringHTML += "<li>< "+properties[property]['uri']+" >: <ul>";
+		stringHTML += "<li ><span class='property'>< "+properties[property]['uri']+" ></span>: <ul>";
 		for(var i =0 ; i < properties[property]['values'].length;i++){
 			stringHTML += "<li> "+properties[property]['values'][i]+" </li>"
 		}
 		stringHTML += "</ul></li>";
 	}
 	stringHTML += "</ul><br/><form action='"+"{{url_for('plot')}}"+"' method='post' id='plotGraph'> <input type='hidden' name='uri' id='input_uri'> <center> <input type='submit' onClick='submitForm("+'"'+uri+'"'+");' name='searchButton' value='Explorar'></center></form>";
+
+	div.innerHTML = stringHTML;
+	document.getElementById('modelDiv').style.display='block';
+});
+
+
+s.bind('clickEdge', function(e) {
+	var uri = e.data.edge.uri;
+	var sourceUri = e.data.edge.sourceUri;
+	var targetUri = e.data.edge.targetUri;
+	var div = document.getElementById('properties');
+	var stringHTML = "<center><h3>< "+uri+" ></h3></center><br/><ul>";
+	stringHTML += "<li><span class='property'>Source</span>:<br/>"+sourceUri+"</li>";
+	stringHTML += "<li><span class='property'>Target</span>:<br/>"+targetUri+"</li>";
+	stringHTML += "</ul>";
+
 
 	div.innerHTML = stringHTML;
 	document.getElementById('modelDiv').style.display='block';

@@ -17,8 +17,13 @@ app = Flask(__name__)
 def getDatatypeProperties(uri):
 	sparql.setQuery("""
 	    SELECT DISTINCT ?p ?o FROM """+graph+""" WHERE{
-			"""+uri+""" ?p ?o.
-			FILTER(isLiteral(?o))
+			{
+				"""+uri+""" ?p ?o.
+				FILTER(isLiteral(?o))
+			}UNION{
+				"""+uri+""" ?p ?o.
+				FILTER(str(?p) = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+			}
 		}
 	""")
 	sparql.setReturnFormat(JSON)

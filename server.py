@@ -1,10 +1,13 @@
 from flask import Flask,render_template,request, redirect, url_for
 from SPARQLWrapper import SPARQLWrapper, JSON
 import hashlib
+import json
 
+endpoint = "http://localhost:8890/sparql"
+graph = "http://localhost:8890/DAV/drugs"
 
-sparql = SPARQLWrapper("http://localhost:8890/sparql")
-graph = "<http://localhost:8890/DAV/drugs>"
+sparql = SPARQLWrapper(endpoint)
+
 visited = set()
 edges = set()
 nodes = {}
@@ -15,8 +18,8 @@ app = Flask(__name__)
 
 # 	return redirect(url_for("menu"))
 def getDatatypeProperties(uri):
-	sparql.setQuery("""
-	    SELECT DISTINCT ?p ?o FROM """+graph+""" WHERE{
+	query = """
+	    SELECT DISTINCT ?p ?o """+graph+""" WHERE{
 			{
 				"""+uri+""" ?p ?o.
 				FILTER(isLiteral(?o))
@@ -25,7 +28,9 @@ def getDatatypeProperties(uri):
 				FILTER(str(?p) = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
 			}
 		}
-	""")
+	"""
+	sparql.setQuery(query)
+	# print(query)
 	sparql.setReturnFormat(JSON)
 	results = sparql.query().convert()
 	properties = {}
@@ -38,12 +43,14 @@ def getDatatypeProperties(uri):
 	return properties
 
 def getObjectProperties(uri):
-	sparql.setQuery("""
-	    SELECT DISTINCT ?p ?o FROM """+graph+""" WHERE{
+	query = """
+	    SELECT DISTINCT ?p ?o """+graph+""" WHERE{
 			"""+uri+""" ?p ?o.
 			FILTER(isIRI(?o) && regex(str(?p), "^(?!http://www.w3.org/1999/02/22-rdf-syntax-ns#type)",'i') && regex(str(?p), "^(?!http://www.w3.org/2002/07/owl#).+") && regex(str(?o), "^(?!http://www.w3.org/2002/07/owl#).+"))
 		}
-	""")
+	"""
+	sparql.setQuery(query)
+	# print(query)
 	sparql.setReturnFormat(JSON)
 	results = sparql.query().convert()
 	neighbors = []
@@ -58,10 +65,19 @@ def searchTem(term):
 		PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 		PREFIX dc:<http://purl.org/dc/elements/1.1/>
 		PREFIX skos:<http://www.w3.org/2004/02/skos/core#>
-	    SELECT DISTINCT ?s ?term ?types FROM """+graph+""" WHERE{
-			 {?s rdfs:label ?term; a ?types} UNION
-			 {?s dc:title ?term; a ?types} UNION
-			 {?s skos:prefLabel ?term; a ?types} 
+	    SELECT DISTINCT ?s ?p ?term """+graph+""" WHERE{
+			 {
+			 	?s rdfs:label ?term
+			 	BIND("rdfs:label" as ?p)
+			 } UNION
+			 {
+			 	?s dc:title ?term
+			 	BIND("dc:title" as ?p)
+		 	} UNION
+			{
+				?s skos:prefLabel ?term
+				BIND("skos:prefLabel" as ?p)
+			} 
 			FILTER(REGEX(str(?term),'"""+term+"""','i'))
 		}ORDER BY strlen(str(?term))
 	""")
@@ -69,7 +85,7 @@ def searchTem(term):
 	results = sparql.query().convert()
 	resultss = []
 	for result in results["results"]["bindings"]:
-		resultss.append((result['s']['value'],result['term']['value'],result['types']['value']))
+		resultss.append((result['s']['value'],result['p']['value'],result['term']['value']))
 	return resultss
 
 def visit_node(uri,depth):
@@ -90,10 +106,13 @@ def explore(uri):
 	nodes.clear()
 	visit_node(uri,depth)
 
-@app.route("/plot",methods=['POST'])
+@app.route("/plot",methods=['POST','GET'])
 def plot():
-	uri = "<"+request.form['uri']+">"
-	print(uri)
+	if request.method == 'GET':
+		uri = "<"+request.full_path.replace("/plot?uri=","")+">"
+	else:
+		uri = "<"+request.form['uri']+">"
+	# print(request.values)
 	explore(uri)
 	return render_template('plot.html',nodes=nodes,edges=edges,uri=uri)
 
@@ -105,6 +124,17 @@ def search(term):
 
 	return render_template("index.html",results=results)
 
+@app.route("/search")
+def search_get():
+	term = request.values['term']
+	result_dict = []
+	if term != " ":
+		results = searchTem(term)
+		for result in results:
+			result_dict.append({'uri':result[0],'property':result[1],'value':result[2]})
+
+	return json.dumps(result_dict)
+
 @app.route("/")
 def index():
 	return redirect(url_for("search",term=" "))
@@ -114,4 +144,6 @@ def uri_to_hash(uri):
 
 if __name__ == "__main__":
 	#app.run(host='200.19.182.252')
+	if graph != "":
+		graph = " FROM <"+graph+"> "
 	app.run(host='0.0.0.0')

@@ -30,12 +30,14 @@
 				<table id="listaOnt">
 					<tr>
 						<th>Term</th>
-						<th>Class</th>
+						<th>Property</th>
+						<th>Value</th>
 					</tr>
 					{%set count = {'c':0}%}
 					{% for result in results %}
 						{%set id = "cor"+ (count.c%2)|string%}
 						<tr id="{{id}}" onClick="submitForm('{{result[0]}}');">
+							<td> {{result[0]}}</td>
 							<td> {{result[1]}}</td>
 							<td> {{result[2]}}</td>						
 						</tr>
